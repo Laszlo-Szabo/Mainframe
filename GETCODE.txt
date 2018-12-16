@@ -1,0 +1,131 @@
+#pragma filetag("IBM-037")
+#include <stdio.h>
+#include <string.h>
+#define C0 8            /* Allowable length for TSO userID, job name */
+#define C1 39           /* Number of valid characters in a job name */
+#define NUMBEROFTASKS 4 /* Number of eligible job names (tasks) */
+
+int main(void) {
+
+  int i, j, k, m, n;
+  char jobname[C0+1];
+  char userid[C0+1];
+  _Bool check = 0;
+
+  /* Control Block pointer -> ASCB address in PSA */
+  int *CB_ptr = (int *)0x0224;
+
+  /* Control Block pointer -> ASSB address in ASCB */
+  CB_ptr = (int *)(*CB_ptr + 0x0150);
+
+  /* Control Block pointer -> JSAB address in ASSB */
+  CB_ptr = (int *)(*CB_ptr + 0xA8);
+
+  /* Mapping pointers JSABJBNM -> job name, JSABUSID -> user ID */
+  char *JSABJBNM = (char *)(*CB_ptr + 0x1C);
+  char *JSABUSID = (char *)(*CB_ptr + 0x2C);
+
+  for (i = 0; i <= C0; i++) {
+    if (i == C0) {
+      jobname[i] = '\0';
+      userid[i] = '\0';
+      break;
+    }
+    jobname[i] = *JSABJBNM;
+    userid[i] = *JSABUSID;
+    JSABJBNM++;
+    JSABUSID++;
+  }
+
+  /* Check if job name is eligible */
+  char jobnameAllow[NUMBEROFTASKS][C0+1];
+  strcpy(jobnameAllow[0],"INTRPSEC\0");
+  strcpy(jobnameAllow[1],"ESTBLENV\0");
+  strcpy(jobnameAllow[2],"REXXRAND\0");
+  strcpy(jobnameAllow[3],"SENDMAIL\0");
+
+  for (i = 0; i < NUMBEROFTASKS; i++) {
+    if (strcmp(jobname,jobnameAllow[i]) == 0) {
+      check = 1;
+    }
+  }
+  if (check == 0) {
+    printf("\n\nGETCODE detected error, RC-08\n"
+           "-----------------------------\n");
+    printf("\nReason:\n-------\nJob name %s is incorrect.\n", jobname);
+    printf("Please, specify the correct one from the eligible "
+           "job names below:\n");
+    printf("----------------------------------------------------------"
+           "--------\n");
+    for (i = 0; i < NUMBEROFTASKS; i++) {
+      printf("%d: ", i+1);
+      printf(jobnameAllow[i]);
+      printf("\n");
+    }
+    printf("\n");
+    return 8;
+  }
+
+  /* Vigenere cipher */
+  char tabula_recta[C1][C1+1];
+  char cipher_key[C0+1];
+  char cipher_text[C0+1];
+
+  for (i = 0x50, j = 0; i < 0xFA; i++, j++){
+    switch (i) {
+      case 0xEA:
+        i += 0x06;
+        break;
+      case 0xDA:
+        i += 0x08;
+        break;
+      case 0xCA:
+        i += 0x07;
+        break;
+      case 0x7C:
+        i += 0x45;
+        break;
+      case 0x5C:
+        i += 0x1F;
+        break;
+      case 0x51:
+        i += 0x0A;
+        break;
+    }
+    tabula_recta[0][j] = (char)i;
+  }
+  tabula_recta[0][C1] = '\0';
+
+  for (i = 1; i < C1; i++) {
+    for (j = 0; j < (C1-i); j++) {
+      tabula_recta[i][j] = tabula_recta[0][i+j];
+    }
+    for (j = C1-i, k = 0; j < C1; j++, k++) {
+      tabula_recta[i][j] = tabula_recta[0][k];
+    }
+    tabula_recta[i][C1] = '\0';
+  }
+
+  for (i = 0, j = C0-5; i < C0; i++, j++) {
+    if (j > 6) { j = 3; }
+    cipher_key[i] = userid[j];
+  }
+  cipher_key[C0] = '\0';
+
+  for (i = 0; i < C0; i++) {
+    for (j = 0; j < C1; j++) {
+      if (cipher_key[i] == tabula_recta[j][0]) { m = j; }
+    }
+    for (k = 0; k < C1; k++) {
+      if (jobname[i] == tabula_recta[0][k]) { n = k; }
+    }
+    cipher_text[i] = tabula_recta[m][n];
+  }
+  cipher_text[C0] = '\0';
+
+    printf("\n\nGETCODE completed succesfully, RC-00\n"
+           "------------------------------------\n");
+    printf("\nJobname: %s", jobname);
+    printf("\nCode:    %s\n", cipher_text);
+return 0;
+}

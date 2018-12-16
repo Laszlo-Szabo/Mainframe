@@ -1,0 +1,95 @@
+#pragma filetag("IBM-037")
+#include <stdio.h>
+#include <string.h>
+#define C0 8            /* Allowable length for TSO userID, job name */
+#define C1 39           /* Number of valid characters in a job name */
+#define NUMBEROFTASKS 5 /* Number of eligible job names (tasks) */
+
+int main(int argc, char *argv[]) {
+
+  if (argc != 3) {
+    printf("\n\nDECIPHER detected error, RC-08\n"
+           "------------------------------\n");
+    printf("\nReason:\n-------\nIncorrect number of parameters have "
+           "been specified.");
+    return 8;
+  }
+
+  int i, j, k, m, n;
+  int toupper(int);
+
+  /* Vigenere decipher */
+  char tabula_recta[C1][C1+1];
+  char jobname[C0+1];
+  char cipher_text[C0+1];
+  char cipher_key[C0+1];
+  char userID[C0];
+
+  strcpy(jobname, argv[1]);
+  strcpy(cipher_text, argv[2]);
+
+  for (i = 0; i < C0; i++) {
+    jobname[i] = (char)toupper((int)jobname[i]);
+    cipher_text[i] = (char)toupper((int)cipher_text[i]);
+  }
+
+  for (i = 0x50, j = 0; i < 0xFA; i++, j++){
+    switch (i) {
+      case 0xEA:
+        i += 0x06;
+        break;
+      case 0xDA:
+        i += 0x08;
+        break;
+      case 0xCA:
+        i += 0x07;
+        break;
+      case 0x7C:
+        i += 0x45;
+        break;
+      case 0x5C:
+        i += 0x1F;
+        break;
+      case 0x51:
+        i += 0x0A;
+        break;
+    }
+    tabula_recta[0][j] = (char)i;
+  }
+  tabula_recta[0][C1] = '\0';
+
+  for (i = 1; i < C1; i++) {
+    for (j = 0; j < (C1-i); j++) {
+      tabula_recta[i][j] = tabula_recta[0][i+j];
+    }
+    for (j = C1-i, k = 0; j < C1; j++, k++) {
+      tabula_recta[i][j] = tabula_recta[0][k];
+    }
+    tabula_recta[i][C1] = '\0';
+  }
+
+  for (i = 0; i < C0; i++) {
+    for (j = 0; j < C1; j++) {
+      if (jobname[i] == tabula_recta[0][j]) { m = j; }
+    }
+    for (j = 0; j < C1; j++) {
+      if (cipher_text[i] == tabula_recta[m][j]) { n = j; }
+    }
+    cipher_key[i] = tabula_recta[0][n];
+  }
+  cipher_key[C0] = '\0';
+
+  strcpy(userID,"HUZ\0");
+  for (i = 3; i < C0; i++) {
+    userID[i] = cipher_key[i-3];
+  }
+  userID[C0-1] = '\0';
+
+  printf("\n\nDECIPHER completed succesfully, RC-00\n"
+         "-------------------------------------");
+  printf("\nCipher text: %s", cipher_text);
+  printf("\nJob name   : %s", jobname);
+  printf("\nUserID     : %s", userID);
+
+return 0;
+}
